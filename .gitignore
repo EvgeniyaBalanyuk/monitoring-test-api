@@ -1,0 +1,9 @@
+# Локальные папки Terraform
+.terraform/
+# Лок-файл
+.terraform.lock.hcl
+# Файлы состояния
+*.tfstate
+*.tfstate.*
+# Секретные файлы
+secret.auto.tfvars
