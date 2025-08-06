@@ -1,0 +1,77 @@
+- name: Установка и настройка мониторинга
+  hosts: masters
+  become: true
+
+  tasks:
+    - name: Установка зависимости curl
+      apt:
+        name: curl
+        state: present
+        update_cache: yes
+
+    - name: Создание директорий
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - /var/log
+        - /var/run
+
+    - name: Копирование скрипта мониторинга
+      copy:
+        src: monitoring.sh
+        dest: /usr/local/bin/monitoring.sh
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Create systemd service
+      copy:
+        dest: /etc/systemd/system/monitoring.service
+        content: |
+          [Unit]
+          Description=Monitoring script for process test
+          After=network.target
+          
+          [Service]
+          Type=oneshot           
+          ExecStart=/usr/local/bin/monitoring.sh
+          ExecStartPost=/bin/bash -c 'echo "$(date +%%Y-%%m-%%d\ %%H:%%M:%%S) - monitoring.service перезапущен" >> /var/log/monitoring.log'
+          User=root
+
+          [Install]
+          WantedBy=multi-user.target 
+      notify:
+        - Reload systemd
+
+    - name: Create systemd timer
+      copy:
+        dest: /etc/systemd/system/monitoring.timer
+        content: |
+          [Unit]
+          Description=Run monitoring script every minute
+
+          [Timer]
+          OnBootSec=30
+          OnUnitActiveSec=60
+          Unit=monitoring.service
+
+          [Install]
+          WantedBy=timers.target   
+      notify:
+        - Reload systemd
+
+    - name: Включение и запуск таймера
+      systemd:
+        name: monitoring.timer
+        enabled: yes
+        state: started
+
+  handlers:
+    - name: Reload systemd
+      become: true
+      systemd:
+        daemon_reload: yes
